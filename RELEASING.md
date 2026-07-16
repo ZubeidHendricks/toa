@@ -16,6 +16,35 @@ bypasses 2FA in CI).
 printf '%s' "<token>" | gh secret set NPM_TOKEN --repo ZubeidHendricks/toad
 ```
 
+Two further secrets are **optional** — without them the release still succeeds
+and the corresponding publish step is skipped:
+
+- **`VSCE_PAT`** — publishes the VS Code extension to the Marketplace. Create a
+  publisher at <https://marketplace.visualstudio.com/manage> matching the
+  `publisher` field in `editors/vscode/package.json` (`ZubeidHendricks`), then
+  an Azure DevOps PAT with the **Marketplace → Manage** scope
+  ([docs](https://code.visualstudio.com/api/working-with-extensions/publishing-extension#get-a-personal-access-token)).
+- **`OVSX_PAT`** — publishes to [Open VSX](https://open-vsx.org) (used by
+  VSCodium, Gitpod, Theia…). Sign in with GitHub, create the `ZubeidHendricks`
+  namespace, and generate an access token
+  ([docs](https://github.com/eclipse/openvsx/wiki/Publishing-Extensions)).
+
+```bash
+printf '%s' "<pat>" | gh secret set VSCE_PAT --repo ZubeidHendricks/toad
+printf '%s' "<pat>" | gh secret set OVSX_PAT --repo ZubeidHendricks/toad
+```
+
+Either way, every release attaches the packaged `.vsix` (and standalone `toac`
+binaries for macOS/Linux/Windows, plus `SHA256SUMS`) to the GitHub Release.
+
+## Other channels
+
+- **Homebrew** — the [homebrew-toad tap](https://github.com/ZubeidHendricks/homebrew-toad)
+  bumps itself: a daily workflow checks npm, updates the formula's URL+sha256,
+  verifies with `brew install` + `brew test` on macOS, and pushes. To ship a
+  brew update immediately after a release: *homebrew-toad → Actions → bump →
+  Run workflow*.
+
 ## Cutting a release
 
 1. **Bump the version** in both packages and the exported constants — keep them in sync:
