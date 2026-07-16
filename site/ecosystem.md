@@ -45,19 +45,19 @@ The **[TOAD Agent extension](https://github.com/ZubeidHendricks/toad/tree/main/e
 - **Hovers & completions** — docs for every top-level key and template construct, plus your declared `inputs.*` names.
 - **Format on save** — `toac fmt`'s canonical formatter as a document formatter.
 
-Until it's on the marketplace, install from source:
+Install it from the VS Code Marketplace or [Open VSX](https://open-vsx.org/)
+(search for **TOAD Agent**), or grab the `.vsix` attached to the
+[latest GitHub release](https://github.com/ZubeidHendricks/toad/releases/latest):
 
 ```bash
-cd editors/vscode
-npx @vscode/vsce package
-code --install-extension toad-agent-0.5.0.vsix
+code --install-extension toad-agent.vsix
 ```
 
 The same TextMate grammar powers the code blocks on this site.
 
 ### Every other editor — the language server
 
-`toac lsp` is a standalone [Language Server](https://microsoft.github.io/language-server-protocol/) over stdio: the same diagnostics, hovers, completions, and formatting, for any LSP-capable editor. Install the compiler globally (`npm i -g toad-compiler`) so `toac` is on your `PATH`, then point your editor at `toac lsp` for the `agent` language (files ending in `.agent`).
+`toac lsp` is a standalone [Language Server](https://microsoft.github.io/language-server-protocol/) over stdio: the same diagnostics, hovers, completions, and formatting, for any LSP-capable editor. Install the compiler globally (`npm i -g toad-compiler`, or `brew install zubeidhendricks/toad/toac`, or a [standalone binary](https://github.com/ZubeidHendricks/toad/releases/latest) — no Node needed) so `toac` is on your `PATH`, then point your editor at `toac lsp` for the `agent` language (files ending in `.agent`).
 
 **Neovim** (with [`nvim-lspconfig`](https://github.com/neovim/nvim-lspconfig) or the built-in API):
 

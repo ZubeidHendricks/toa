@@ -3,6 +3,25 @@
 All notable changes to `toad-compiler` and `toad-runtime`. The `.agent` format
 is versioned separately in [`SPEC.md`](./SPEC.md).
 
+## 0.7.1
+
+The distribution release: no library changes — `toac` now installs everywhere.
+
+- **Homebrew** — `brew install zubeidhendricks/toad/toac`, via the new
+  [homebrew-toad tap](https://github.com/ZubeidHendricks/homebrew-toad). The
+  tap checks npm daily and bumps its formula automatically (install + `brew
+test` verified in its CI before every bump lands).
+- **Standalone binaries** — release CI now compiles `toac` into dependency-free
+  executables (macOS arm64/x64, Linux x64/arm64, Windows x64; `bun --compile`)
+  and attaches them, with a `SHA256SUMS` file, to the GitHub Release. The full
+  CLI works standalone, including `toac lsp`.
+- **VS Code extension (0.6.0)** — packaged in release CI with the compiler
+  re-bundled from the same tag, attached to the GitHub Release as a `.vsix`,
+  and published to the VS Code Marketplace / Open VSX when the `VSCE_PAT` /
+  `OVSX_PAT` secrets are configured.
+- Docs: install matrices in the README and Getting Started now cover
+  npm/pnpm/Homebrew/binaries; `llms.txt` lists the new channels.
+
 ## 0.7.0
 
 The security release: a framework-level defense against the multi-agent

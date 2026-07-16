@@ -149,19 +149,26 @@ normative, so other tools can target it. Proposals welcome as issues/PRs.
 
 ## Editor support
 
-A VS Code extension with full `.agent` syntax highlighting lives in
-[`editors/vscode`](./editors/vscode) (the same TextMate grammar powers the
-site's code blocks).
+A VS Code extension — syntax highlighting, live diagnostics, hovers,
+completions, format-on-save — lives in [`editors/vscode`](./editors/vscode)
+and ships to the VS Code Marketplace, Open VSX, and as a `.vsix` on every
+[GitHub release](https://github.com/ZubeidHendricks/toad/releases/latest).
+Every other editor gets the same features through `toac lsp` — see
+[ecosystem](https://zubeidhendricks.github.io/toad/ecosystem.html#editor-support).
 
 ## Install
 
 ```bash
-# the compiler + `toac` CLI
-npm i -g toad-compiler
+# the compiler + `toac` CLI — pick one:
+npm i -g toad-compiler                   # npm
+brew install zubeidhendricks/toad/toac   # Homebrew (macOS / Linux)
 
 # the runtime your compiled agents import
 npm i toad-runtime @anthropic-ai/sdk
 ```
+
+Standalone `toac` binaries (no Node required) for macOS, Linux, and Windows
+are attached to every [GitHub release](https://github.com/ZubeidHendricks/toad/releases/latest).
 
 Scaffold, format, and compile an agent:
 

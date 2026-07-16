@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.6.0
+
+- First release published to the VS Code Marketplace and Open VSX (the `.vsix`
+  is also attached to every [GitHub release](https://github.com/ZubeidHendricks/toad/releases)).
+- The extension is now packaged and published by release CI, re-bundling the
+  compiler from the same tag — the bundled `toac` can no longer drift behind
+  the npm release.
+
+## 0.5.0
+
+- Hover and completion now come from the compiler's shared editor-services
+  module (`hoverAt`/`completionsAt`) — the same source of truth as `toac lsp` —
+  instead of extension-local copies.
+
 ## 0.4.0
 
 - **Formatting** — Format Document (and `editor.formatOnSave`) runs the canonical `toac fmt`: keys reordered to the spec's schema order, indentation/spacing/blank lines normalized, prompt/system block content preserved exactly. Invalid files are left untouched.

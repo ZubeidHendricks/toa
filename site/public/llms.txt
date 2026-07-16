@@ -2,7 +2,7 @@
 
 > TOAD (Token-Oriented Agentic Development) is a compile-first framework for building AI agents. An agent is a tiny declarative `.agent` file — a strict superset of TOON (Token-Oriented Object Notation) — that the `toac` compiler turns into readable, fully-typed TypeScript running on Claude. Authoring is 30–38% fewer tokens than equivalent JSON; at runtime, tool results can be re-encoded as TOON for another 30–40% savings on tabular data.
 
-Key facts: two npm packages (`toad-compiler` with the `toac` CLI, and `toad-runtime`); typed inputs/outputs/tools backed by zod; a type-checked prompt template language ({inputs.x}, {#each}, {#if}); agent composition via `uses:`; located file:line:col diagnostics.
+Key facts: two npm packages (`toad-compiler` with the `toac` CLI, and `toad-runtime`); also installable via Homebrew (`brew install zubeidhendricks/toad/toac`) or standalone binaries for macOS/Linux/Windows on GitHub releases; a VS Code extension (TOAD Agent) plus a `toac lsp` language server for every other editor; typed inputs/outputs/tools backed by zod; a type-checked prompt template language ({inputs.x}, {#each}, {#if}); agent composition via `uses:`; located file:line:col diagnostics.
 
 ## Docs
 

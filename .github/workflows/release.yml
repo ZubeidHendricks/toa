@@ -1,10 +1,18 @@
 name: Release
 
-# Publishes the packages to npm when a vX.Y.Z tag is pushed.
-# Bump the version in packages/*/package.json, commit, then:
+# Runs when a vX.Y.Z tag is pushed and ships every distribution channel:
+#   publish   — npm (toad-compiler, toad-runtime). Requires the NPM_TOKEN secret.
+#   binaries  — standalone toac executables (bun --compile) attached to a
+#               GitHub Release: macOS arm64/x64, Linux x64/arm64, Windows x64.
+#   extension — packages the VS Code extension; publishes to the VS Code
+#               Marketplace when VSCE_PAT is set and to Open VSX when OVSX_PAT
+#               is set (each step is skipped, not failed, without its token).
+#
+# To cut a release: bump the version in packages/*/package.json, commit, then
 #   git tag vX.Y.Z && git push origin vX.Y.Z
-# Requires an NPM_TOKEN repo secret (npm automation/granular token with publish rights).
-# pnpm -r publish skips any version already on the registry, so re-running is safe.
+# pnpm -r publish skips any version already on the registry, so re-running is
+# safe; the Homebrew tap (ZubeidHendricks/homebrew-toad) bumps itself from npm
+# on a daily schedule.
 
 on:
   push:
@@ -34,3 +42,97 @@ jobs:
       - run: pnpm -r publish --access public --no-git-checks
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+  binaries:
+    needs: publish
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: pnpm/action-setup@v6
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - uses: oven-sh/setup-bun@v2
+
+      - run: pnpm install --frozen-lockfile
+
+      - run: pnpm build
+
+      - name: Compile standalone toac binaries
+        run: |
+          mkdir -p dist-bin
+          for target in linux-x64 linux-arm64 darwin-x64 darwin-arm64 windows-x64; do
+            out="dist-bin/toac-${target}"
+            if [ "$target" = "windows-x64" ]; then out="${out}.exe"; fi
+            bun build --compile --minify --target="bun-${target}" \
+              --outfile "$out" packages/compiler/dist/bin.js
+          done
+          cd dist-bin && shasum -a 256 * > SHA256SUMS && cat SHA256SUMS
+
+      - name: Smoke-test the linux-x64 binary
+        run: |
+          ./dist-bin/toac-linux-x64 --version
+          cd "$(mktemp -d)"
+          "$GITHUB_WORKSPACE/dist-bin/toac-linux-x64" init smoke
+          "$GITHUB_WORKSPACE/dist-bin/toac-linux-x64" build smoke.agent
+          "$GITHUB_WORKSPACE/dist-bin/toac-linux-x64" check smoke.agent
+
+      - name: Create GitHub Release with binaries
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" --verify-tag --generate-notes \
+            --title "$GITHUB_REF_NAME" dist-bin/* \
+          || gh release upload "$GITHUB_REF_NAME" dist-bin/* --clobber
+
+  extension:
+    needs: [publish, binaries]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    env:
+      VSCE_PAT: ${{ secrets.VSCE_PAT }}
+      OVSX_PAT: ${{ secrets.OVSX_PAT }}
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: pnpm/action-setup@v6
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      - run: pnpm build
+
+      # Re-bundle so the extension ships the compiler built from this tag.
+      - run: pnpm build:vscode
+
+      - name: Package the VS Code extension
+        working-directory: editors/vscode
+        run: npx --yes @vscode/vsce package --out toad-agent.vsix
+
+      - name: Attach .vsix to the GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release upload "$GITHUB_REF_NAME" editors/vscode/toad-agent.vsix --clobber \
+          || echo "release not created yet; vsix will ship via marketplaces only"
+
+      - name: Publish to VS Code Marketplace
+        if: env.VSCE_PAT != ''
+        working-directory: editors/vscode
+        run: npx --yes @vscode/vsce publish --packagePath toad-agent.vsix --skip-duplicate
+
+      - name: Publish to Open VSX
+        if: env.OVSX_PAT != ''
+        working-directory: editors/vscode
+        run: npx --yes ovsx publish toad-agent.vsix --pat "$OVSX_PAT" --skip-duplicate

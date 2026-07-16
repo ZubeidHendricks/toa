@@ -24,7 +24,21 @@ pnpm add -g toad-compiler
 pnpm add toad-runtime @anthropic-ai/sdk
 ```
 
+```bash [Homebrew]
+# the compiler + `toac` CLI (macOS / Linux)
+brew install zubeidhendricks/toad/toac
+
+# the runtime your compiled agents import
+npm i toad-runtime @anthropic-ai/sdk
+```
+
 :::
+
+No Node at all? Every [GitHub release](https://github.com/ZubeidHendricks/toad/releases/latest)
+ships standalone `toac` binaries for macOS (arm64/x64), Linux (x64/arm64), and
+Windows (x64) — download, `chmod +x`, done. (You'll still need Node to *run*
+compiled agents; the standalone binary covers `check`/`fmt`/`cost`/`lsp`
+workflows and CI.)
 
 ## Your first agent
 
