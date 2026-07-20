@@ -23,6 +23,7 @@ Real logic (what a tool actually does) lives in plain TypeScript, in a co-locate
 | `uses`                  | no  | `uses[N]: a,b`                  | sub-agents wired in as tools via `asTool()`          |
 | `maxTurns` / `retries`  | no  | number                          | tool-use turn cap / model-call retries               |
 | `maxContextTokens`      | no  | number                          | soft per-turn context budget; elides old tool results over it |
+| `retrieval`             | no  | boolean                         | reversible elision (default true): elided results stay readable via an injected `toad_retrieve` tool |
 | `temperature`           | no  | number 0–1                      | sampling temperature (omit for the default)          |
 
 ::: warning Counts are checked

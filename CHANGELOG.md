@@ -3,6 +3,23 @@
 All notable changes to `toad-compiler` and `toad-runtime`. The `.agent` format
 is versioned separately in [`SPEC.md`](./SPEC.md).
 
+## 0.7.2
+
+Reversible context compaction — elision you can undo.
+
+- **Reversible elision** (`toad-runtime`) — `maxContextTokens` elision no longer
+  destroys context. Each elided tool result is kept in a session-local store
+  keyed by an id (named in the placeholder), and the runtime auto-injects a
+  `toad_retrieve` tool so the model can read the full original back on demand.
+  The budget still bounds what's sent per turn; it no longer discards what the
+  model may still need. The store persists in `SessionState`, so retrieval
+  survives resume. Set `retrieval: false` for the old destructive behavior.
+- **`retrieval`** is a first-class `.agent` key — validated, code-generated,
+  hovered in editors, and ordered by `toac fmt`. The `.agent` format spec is
+  bumped to **0.5** ([SPEC.md §4.12](./SPEC.md)).
+- Fix: `maxContextTokens` is now included in `toac fmt`'s canonical key order
+  (previously sorted to the end).
+
 ## 0.7.1
 
 The distribution release: no library changes — `toac` now installs everywhere.

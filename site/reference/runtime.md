@@ -224,6 +224,20 @@ const agent = createAgent({
 
 It's a soft ceiling based on the same heuristic estimate as `onContext` — watch `onContext`'s `messages` flatten out across turns once it's set. Omitted = no compaction.
 
+### Reversible elision: `toad_retrieve`
+
+Elision under `maxContextTokens` is **reversible by default**. Instead of throwing an elided result away, the runtime keeps the original in a session-local store and leaves a placeholder that names a retrieval id. It also injects a `toad_retrieve` tool: when the model needs a detail from an elided result, it calls `toad_retrieve` with that id and gets the full original back. So the budget bounds what is _sent_ each turn without permanently destroying context the model may still need — the oldest turn's error survives even after its result scrolls out of budget.
+
+```ts
+const agent = createAgent({
+  // ...
+  maxContextTokens: 8000,
+  retrieval: true, // default; set false to elide destructively (no store, no tool)
+});
+```
+
+The store rides along in `session.state`, so retrieval keeps working after you persist and resume a session. `retrieval` is also a `.agent` key. It has no effect without `maxContextTokens`.
+
 ### Ephemeral tool results
 
 Some tools return a large payload the model needs to read **once** — a fetched page, a big query dump. Mark such a tool `ephemeral` and its result is sent in full to the next model call, then elided on every turn after (a short placeholder, pairing preserved). This fires regardless of `maxContextTokens`:

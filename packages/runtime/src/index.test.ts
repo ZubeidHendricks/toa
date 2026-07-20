@@ -3,7 +3,7 @@ import * as runtime from "./index.js";
 
 describe("toad-runtime exports", () => {
   it("exposes the public API", () => {
-    expect(runtime.RUNTIME_VERSION).toBe("0.7.1");
+    expect(runtime.RUNTIME_VERSION).toBe("0.7.2");
     expect(typeof runtime.createAgent).toBe("function");
     expect(typeof runtime.defineTool).toBe("function");
     expect(typeof runtime.anthropicClient).toBe("function");

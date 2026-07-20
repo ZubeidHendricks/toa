@@ -2,6 +2,35 @@
 
 What's new in TOAD. Follow along on [GitHub releases](https://github.com/ZubeidHendricks/toad/releases).
 
+## TOAD 0.7.2 — elision you can undo {#v0-7-2}
+
+_July 20, 2026_
+
+Long agent loops die of context bloat. Every framework caps history growth the
+same way — drop the oldest tool results once you cross a budget — and that fix
+is quietly **lossy**: elide the turn where the error happened, keep the chatty
+successes, and the model is left reasoning about a gap it can't see.
+
+`maxContextTokens` elision is now **reversible by default**:
+
+- Each elided result is kept in a **session-local store**, keyed by an id; the
+  placeholder the model sees names that id.
+- The runtime **auto-injects a `toad_retrieve` tool** — when the model needs a
+  detail from an elided result, it calls `toad_retrieve` with the id and gets
+  the full original back.
+- The store rides along in `session.state`, so **retrieval survives resume**.
+- Prefer the old behavior? Set `retrieval: false` (config or `.agent` key) to
+  elide destructively — no store, no injected tool.
+
+Same token ceiling per turn, without permanently destroying context the model
+may still need. It's a first-class `.agent` key and part of the format spec
+([SPEC 0.5, §4.12](/reference/spec)). Backward compatible: existing agents get
+reversible elision for free the moment they set a budget.
+
+```bash
+npm i toad-runtime@0.7.2
+```
+
 ## TOAD 0.7.0 — the security release {#v0-7-0}
 
 _June 18, 2026_
