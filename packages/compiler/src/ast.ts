@@ -78,6 +78,13 @@ export interface AgentAst {
   maxTurns?: number;
   /** Soft per-turn context-token budget; older tool results are elided over it. */
   maxContextTokens?: number;
+  /**
+   * Whether budget elision is reversible (default true): elided results are kept
+   * in a session store and a `toad_retrieve` tool is injected so the model can
+   * read them back. `false` elides destructively. No effect without
+   * `maxContextTokens`.
+   */
+  retrieval?: boolean;
   /** Retries for the model call on error. */
   retries?: number;
   /** Sampling temperature (0–1); omitted = the API default. */

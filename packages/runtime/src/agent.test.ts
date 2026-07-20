@@ -1303,6 +1303,171 @@ describe("maxContextTokens compaction", () => {
   });
 });
 
+describe("reversible elision (toad_retrieve)", () => {
+  const big = (tag: string): string => `RESULT-${tag} `.repeat(200);
+  const fetch = defineTool({
+    description: "fetch",
+    input: z.object({ n: z.number() }),
+    run: ({ n }: { n: number }) => big(String(n)),
+  });
+  const toolResultBlocks = (session: {
+    messages: readonly { content: unknown }[];
+  }) =>
+    session.messages
+      .filter((m) => Array.isArray(m.content))
+      .flatMap(
+        (m) =>
+          m.content as Array<{
+            type?: string;
+            tool_use_id?: string;
+            content?: unknown;
+          }>,
+      )
+      .filter((b) => b.type === "tool_result");
+
+  it("elides with a retrievable id and hands the original back via toad_retrieve", async () => {
+    const client = scriptedClient([
+      {
+        stop_reason: "tool_use",
+        content: [
+          { type: "tool_use", id: "a", name: "fetch", input: { n: 1 } },
+        ],
+      },
+      {
+        stop_reason: "tool_use",
+        content: [
+          { type: "tool_use", id: "b", name: "fetch", input: { n: 2 } },
+        ],
+      },
+      {
+        stop_reason: "tool_use",
+        content: [
+          { type: "tool_use", id: "c", name: "fetch", input: { n: 3 } },
+        ],
+      },
+      {
+        stop_reason: "tool_use",
+        content: [
+          {
+            type: "tool_use",
+            id: "r",
+            name: "toad_retrieve",
+            input: { id: "a" },
+          },
+        ],
+      },
+      { stop_reason: "end_turn", content: [{ type: "text", text: "done" }] },
+    ]);
+    const session = createAgent({
+      name: "t",
+      model: "m",
+      tools: { fetch },
+      prompt: () => "go",
+      maxContextTokens: 250,
+      client,
+    }).session({});
+    await session.send();
+
+    const blocks = toolResultBlocks(session);
+    // Result "a" was elided with a retrievable placeholder naming its id.
+    const elidedA = blocks.find((b) => b.tool_use_id === "a");
+    expect(String(elidedA?.content)).toContain("toad_retrieve");
+    expect(String(elidedA?.content)).toContain('"a"');
+    // The toad_retrieve call returned the full original content.
+    const retrieved = blocks.find((b) => b.tool_use_id === "r");
+    expect(String(retrieved?.content)).toContain("RESULT-1");
+  });
+
+  it("elides destructively (no toad_retrieve, no store) when retrieval is off", async () => {
+    const client = scriptedClient([
+      {
+        stop_reason: "tool_use",
+        content: [
+          { type: "tool_use", id: "a", name: "fetch", input: { n: 1 } },
+        ],
+      },
+      {
+        stop_reason: "tool_use",
+        content: [
+          { type: "tool_use", id: "b", name: "fetch", input: { n: 2 } },
+        ],
+      },
+      { stop_reason: "end_turn", content: [{ type: "text", text: "done" }] },
+    ]);
+    const session = createAgent({
+      name: "t",
+      model: "m",
+      tools: { fetch },
+      prompt: () => "go",
+      maxContextTokens: 250,
+      retrieval: false,
+      client,
+    }).session({});
+    await session.send();
+
+    const text = JSON.stringify(session.messages);
+    expect(text).toContain("elided to stay within the context budget");
+    expect(text).not.toContain("toad_retrieve");
+    expect(session.state.retrievable).toBeUndefined();
+  });
+
+  it("keeps the retrieve store in session state and reuses it after resume", async () => {
+    const clientA = scriptedClient([
+      {
+        stop_reason: "tool_use",
+        content: [
+          { type: "tool_use", id: "a", name: "fetch", input: { n: 1 } },
+        ],
+      },
+      {
+        stop_reason: "tool_use",
+        content: [
+          { type: "tool_use", id: "b", name: "fetch", input: { n: 2 } },
+        ],
+      },
+      { stop_reason: "end_turn", content: [{ type: "text", text: "paused" }] },
+    ]);
+    const config = {
+      name: "t",
+      model: "m",
+      tools: { fetch },
+      prompt: () => "go",
+      maxContextTokens: 250,
+    };
+    const sessionA = createAgent({ ...config, client: clientA }).session({});
+    await sessionA.send();
+    const state = sessionA.state;
+    // "a" aged out of the last slot and was elided → persisted for retrieval.
+    expect(state.retrievable).toBeDefined();
+    expect(Object.keys(state.retrievable ?? {})).toContain("a");
+
+    const clientB = scriptedClient([
+      {
+        stop_reason: "tool_use",
+        content: [
+          {
+            type: "tool_use",
+            id: "r",
+            name: "toad_retrieve",
+            input: { id: "a" },
+          },
+        ],
+      },
+      { stop_reason: "end_turn", content: [{ type: "text", text: "resumed" }] },
+    ]);
+    const sessionB = createAgent({ ...config, client: clientB }).session(
+      {},
+      state,
+    );
+    await sessionB.send("continue");
+
+    const retrieved = toolResultBlocks(sessionB).find(
+      (b) => b.tool_use_id === "r",
+    );
+    expect(String(retrieved?.content)).toContain("RESULT-1");
+  });
+});
+
 describe("ephemeral tool results", () => {
   it("elides an ephemeral result after the model has seen it, keeping the latest", async () => {
     const fetchPage = defineTool({

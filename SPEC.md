@@ -40,6 +40,7 @@ The decoded document MUST be an object. Its keys are:
 | `uses`             | no       | list of identifiers (§4.9)             |
 | `maxTurns`         | no       | positive integer                       |
 | `maxContextTokens` | no       | non-negative integer (§4.11)           |
+| `retrieval`        | no       | boolean (§4.12)                        |
 | `retries`          | no       | non-negative integer                   |
 | `temperature`      | no       | number in [0, 1] (§4.10)               |
 
@@ -101,6 +102,10 @@ Sampling temperature, a number in `[0, 1]`. When absent, the model provider's de
 ### 4.11 `maxContextTokens`
 
 A soft per-turn budget (estimated tokens) on the conversation context. When present, a conforming runtime SHOULD bound history growth — for example, by eliding the oldest tool results once the estimated context exceeds the budget — without breaking tool-call/result pairing. The value is advisory and the estimation method is implementation-defined; omitting it disables compaction.
+
+### 4.12 `retrieval`
+
+Whether elision under `maxContextTokens` is reversible. It defaults to `true` and has no effect when `maxContextTokens` is absent. When `true`, a conforming runtime SHOULD retain each elided result and expose a way for the model to read the original back on demand — for example, by keeping the originals in a session-scoped store and injecting a `toad_retrieve` tool keyed by an id named in each elision placeholder — so the budget bounds what is sent per turn without permanently discarding information. When `false`, the runtime elides destructively. A non-boolean value MUST produce an error diagnostic.
 
 ## 5. Types
 
@@ -175,7 +180,7 @@ A document with no error diagnostics is a **valid agent document**.
 
 ## 9. Versioning
 
-This specification is versioned independently of the implementations. Backwards-incompatible changes bump the major version; additions bump the minor version. The version of this document is **0.4** (0.3 added the typed tabular `tools` form, §4.5; 0.4 added `maxContextTokens`, §4.11).
+This specification is versioned independently of the implementations. Backwards-incompatible changes bump the major version; additions bump the minor version. The version of this document is **0.5** (0.3 added the typed tabular `tools` form, §4.5; 0.4 added `maxContextTokens`, §4.11; 0.5 added `retrieval`, §4.12).
 
 ## Appendix A — Complete example
 

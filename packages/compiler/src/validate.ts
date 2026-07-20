@@ -30,6 +30,7 @@ const ALLOWED_KEYS = new Set([
   "system",
   "maxTurns",
   "maxContextTokens",
+  "retrieval",
   "retries",
   "temperature",
   "uses",
@@ -139,6 +140,7 @@ export function validate(
     diagnostics,
     at,
   );
+  const retrieval = parseBoolKey(value, "retrieval", file, diagnostics, at);
   const retries = parseIntKey(value, "retries", file, diagnostics, at);
   const temperature = parseTemperature(value, file, diagnostics, at);
   const prompt =
@@ -199,6 +201,9 @@ export function validate(
   }
   if (maxContextTokens !== undefined) {
     ast.maxContextTokens = maxContextTokens;
+  }
+  if (retrieval !== undefined) {
+    ast.retrieval = retrieval;
   }
   if (retries !== undefined) {
     ast.retries = retries;
@@ -288,6 +293,31 @@ function parseIntKey(
       errorDiagnostic(
         "TOA206",
         `"${key}" must be a non-negative integer`,
+        file,
+        at(key),
+      ),
+    );
+    return undefined;
+  }
+  return v;
+}
+
+function parseBoolKey(
+  obj: JsonObject,
+  key: string,
+  file: string,
+  diagnostics: Diagnostic[],
+  at: Locator,
+): boolean | undefined {
+  const v = obj[key];
+  if (v === undefined) {
+    return undefined;
+  }
+  if (typeof v !== "boolean") {
+    diagnostics.push(
+      errorDiagnostic(
+        "TOA208",
+        `"${key}" must be a boolean (true or false)`,
         file,
         at(key),
       ),

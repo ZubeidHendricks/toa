@@ -31,6 +31,8 @@ export const KEY_DOCS: Record<string, string> = {
   maxTurns: "**maxTurns** — tool-use turn cap (default 8).",
   maxContextTokens:
     "**maxContextTokens** — soft per-turn context budget; oldest tool results are elided once a turn exceeds it.",
+  retrieval:
+    "**retrieval** — whether budget elision is reversible (default true): elided results stay retrievable via an injected `toad_retrieve` tool. Set `false` to elide destructively. No effect without `maxContextTokens`.",
   retries: "**retries** — retry the model call this many times on error.",
   temperature:
     "**temperature** — sampling temperature, a number from 0 to 1; omit for the API default.",

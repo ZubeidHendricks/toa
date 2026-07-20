@@ -26,6 +26,8 @@ const CANONICAL_ORDER = [
   "system",
   "uses",
   "maxTurns",
+  "maxContextTokens",
+  "retrieval",
   "retries",
   "temperature",
 ];

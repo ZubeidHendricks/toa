@@ -105,6 +105,9 @@ export function generate(ast: AgentAst): string {
   if (ast.maxContextTokens !== undefined) {
     lines.push(`  maxContextTokens: ${ast.maxContextTokens},`);
   }
+  if (ast.retrieval !== undefined) {
+    lines.push(`  retrieval: ${ast.retrieval},`);
+  }
   if (ast.retries !== undefined) {
     lines.push(`  retries: ${ast.retries},`);
   }
