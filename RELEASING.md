@@ -42,8 +42,8 @@ binaries for macOS/Linux/Windows, plus `SHA256SUMS`) to the GitHub Release.
 - **Homebrew** — the [homebrew-toad tap](https://github.com/ZubeidHendricks/homebrew-toad)
   bumps itself: a daily workflow checks npm, updates the formula's URL+sha256,
   verifies with `brew install` + `brew test` on macOS, and pushes. To ship a
-  brew update immediately after a release: *homebrew-toad → Actions → bump →
-  Run workflow*.
+  brew update immediately after a release: _homebrew-toad → Actions → bump →
+  Run workflow_.
 
 ## Cutting a release
 

@@ -127,6 +127,13 @@ The generated agent runs a tool-use loop over the Anthropic API with:
   results are elided (oldest first, pairing preserved, the current turn kept), so
   long loops don't grow unbounded — the single biggest recurring cost. Mark a
   tool `ephemeral` to drop its (one-shot) result on later turns regardless.
+- **Reversible elision** — budget elision is lossless by default: each elided
+  result is kept in a session-local store and the runtime auto-injects a
+  `toad_retrieve` tool the model can call (with the id shown in the placeholder)
+  to read the full original back — so the budget bounds what's _sent_ each turn
+  without destroying context the model may still need. The store rides along in
+  `session.state`, so retrieval survives resume. Set `retrieval: false` (config
+  or `.agent` key) to elide destructively instead.
 - **Token-efficient tool results** — set `toolResultFormat: "auto"` to feed tool
   results back to the model as TOON instead of JSON when it saves tokens
   (~30–50% on tabular results), so multi-turn loops stay cheap. Defaults to

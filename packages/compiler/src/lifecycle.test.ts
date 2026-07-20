@@ -39,4 +39,23 @@ describe("lifecycle knobs (maxTurns / retries)", () => {
     const { diagnostics } = analyze(agent(["retries: -1"]), "a.agent");
     expect(diagnostics.map((d) => d.code)).toContain("TOA206");
   });
+
+  it("emits retrieval into createAgent", () => {
+    const { ast, diagnostics } = analyze(
+      agent(["maxContextTokens: 8000", "retrieval: false"]),
+      "a.agent",
+    );
+    expect(diagnostics).toEqual([]);
+    expect(generate(ast!)).toContain("retrieval: false,");
+  });
+
+  it("omits retrieval when not declared", () => {
+    const { ast } = analyze(agent([]), "a.agent");
+    expect(generate(ast!)).not.toContain("retrieval:");
+  });
+
+  it("rejects a non-boolean retrieval (TOA208)", () => {
+    const { diagnostics } = analyze(agent(["retrieval: 1"]), "a.agent");
+    expect(diagnostics.map((d) => d.code)).toContain("TOA208");
+  });
 });

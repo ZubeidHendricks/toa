@@ -21,6 +21,7 @@ import {
 } from "./delegation.js";
 
 const RESPOND_TOOL = "respond";
+const RETRIEVE_TOOL = "toad_retrieve";
 
 /** Token cost of a tool result, reported to `onToolResultEncoded`. */
 export interface ToolResultEncoding {
@@ -122,8 +123,24 @@ export interface AgentConfig<I, O> {
    * with a short placeholder, oldest first) until back under budget — the
    * current turn's fresh results are never elided. Caps the unbounded history
    * growth that dominates long tool loops. Omitted = no compaction.
+   *
+   * Elision is *reversible* by default: each elided result is kept in a
+   * session-local store and the runtime auto-injects a `toad_retrieve` tool the
+   * model can call (with the id shown in the placeholder) to read the full
+   * original back. So the budget bounds what is *sent* each turn without
+   * destroying information the model may still need. Set `retrieval: false` to
+   * elide destructively instead (no store, no extra tool).
    */
   maxContextTokens?: number;
+  /**
+   * Whether budget elision (`maxContextTokens`) is reversible. When `true`
+   * (default) the runtime keeps elided tool results in a session-local store
+   * and exposes a `toad_retrieve` tool so the model can pull an original back
+   * on demand; the store is part of `SessionState`, so it survives resume. Set
+   * `false` to elide destructively — no store and no injected tool, at the cost
+   * of permanently losing elided content. No effect without `maxContextTokens`.
+   */
+  retrieval?: boolean;
   /** Sampling temperature (0–1); omitted = the API default. */
   temperature?: number;
   /** Retry the model call up to this many times on error. */
@@ -191,6 +208,13 @@ export type AgentEvent<O = string> =
 export interface SessionState {
   messages: LlmMessage[];
   usage: TokenUsage;
+  /**
+   * Originals of tool results elided under `maxContextTokens`, keyed by the id
+   * shown in each elision placeholder — the backing store for `toad_retrieve`.
+   * Persisted so retrieval still works after a resume. Absent when nothing was
+   * elided or reversible elision is off (`retrieval: false`).
+   */
+  retrievable?: Record<string, string>;
 }
 
 /**
@@ -247,25 +271,50 @@ export function createAgent<I, O = string>(
 ): Agent<I, O> {
   const maxTurns = config.maxTurns ?? 8;
   const maxTokens = config.maxTokens ?? 4096;
-  const toolDefs = config.tools ?? {};
+  const retrievalOn =
+    config.maxContextTokens !== undefined && config.retrieval !== false;
 
-  const tools: LlmTool[] = Object.entries(toolDefs).map(([name, def]) => ({
-    name,
-    description: def.description,
-    input_schema: toInputSchema(def.input),
-  }));
-  if (config.outputSchema) {
-    tools.push({
-      name: RESPOND_TOOL,
-      description:
-        "Return the final structured result. Call this exactly once when done.",
-      input_schema: toInputSchema(config.outputSchema),
-    });
-  }
-  if (tools.length > 0) {
-    // Cache the (stable) tool prefix across turns.
-    tools[tools.length - 1]!.cache_control = { type: "ephemeral" };
-  }
+  // Build the per-run tool surface: the user's tools, the `respond` tool (when
+  // there's structured output), and — when budget elision is reversible — a
+  // `toad_retrieve` tool bound to a fresh store. The store is per-run so each
+  // session/stream retrieves only its own elided results; the tool *definitions*
+  // are byte-identical across runs, so the cached tool prefix still hits.
+  const buildContext = (): {
+    store: Map<string, string> | undefined;
+    toolDefs: Record<string, AnyToolDef>;
+    tools: LlmTool[];
+  } => {
+    const store = retrievalOn ? new Map<string, string>() : undefined;
+    const toolDefs: Record<string, AnyToolDef> = { ...(config.tools ?? {}) };
+    const tools: LlmTool[] = Object.entries(config.tools ?? {}).map(
+      ([name, def]) => ({
+        name,
+        description: def.description,
+        input_schema: toInputSchema(def.input),
+      }),
+    );
+    if (config.outputSchema) {
+      tools.push({
+        name: RESPOND_TOOL,
+        description:
+          "Return the final structured result. Call this exactly once when done.",
+        input_schema: toInputSchema(config.outputSchema),
+      });
+    }
+    if (store !== undefined) {
+      toolDefs[RETRIEVE_TOOL] = makeRetrieveTool(store);
+      tools.push({
+        name: RETRIEVE_TOOL,
+        description: RETRIEVE_DESCRIPTION,
+        input_schema: toInputSchema(RETRIEVE_SCHEMA),
+      });
+    }
+    if (tools.length > 0) {
+      // Cache the (stable) tool prefix across turns.
+      tools[tools.length - 1]!.cache_control = { type: "ephemeral" };
+    }
+    return { store, toolDefs, tools };
+  };
 
   const systemFor = (inputs: I): string =>
     config.system
@@ -273,6 +322,11 @@ export function createAgent<I, O = string>(
       : (config.description ?? `You are ${config.name}.`);
 
   const makeSession = (inputs: I, state?: SessionState): AgentSession<O> => {
+    const { store, toolDefs, tools } = buildContext();
+    // Reseed the retrieve store so elided results stay reachable after resume.
+    if (store !== undefined && state?.retrievable !== undefined) {
+      for (const [k, v] of Object.entries(state.retrievable)) store.set(k, v);
+    }
     const client = config.client ?? anthropicClient();
     const attempts = (config.retries ?? 0) + 1;
     const callModel = async (
@@ -361,6 +415,7 @@ export function createAgent<I, O = string>(
             systemFor(inputs),
             tools,
             config.maxContextTokens,
+            store,
           );
         }
         reportContext(hooks, systemFor(inputs), tools, messages);
@@ -432,10 +487,14 @@ export function createAgent<I, O = string>(
         return { ...total };
       },
       get state(): SessionState {
-        return {
+        const snapshot: SessionState = {
           messages: structuredClone(messages),
           usage: { ...total },
         };
+        if (store !== undefined && store.size > 0) {
+          snapshot.retrievable = Object.fromEntries(store);
+        }
+        return snapshot;
       },
     };
   };
@@ -531,6 +590,7 @@ export function createAgent<I, O = string>(
         if (config.outputSchema) {
           userText += `\n\nWhen finished, call the \`${RESPOND_TOOL}\` tool with the final result.`;
         }
+        const { store, toolDefs, tools } = buildContext();
         const messages: LlmMessage[] = [{ role: "user", content: userText }];
         const ephemeralIds = new Set<string>();
         const total: TokenUsage = {
@@ -579,6 +639,7 @@ export function createAgent<I, O = string>(
               systemFor(inputs),
               tools,
               config.maxContextTokens,
+              store,
             );
           }
           reportContext(hooks, systemFor(inputs), tools, messages);
@@ -895,6 +956,36 @@ const ELIDED_TOOL_RESULT =
 
 const ELIDED_EPHEMERAL = "[ephemeral tool result elided after use]";
 
+/** Placeholder left for a reversibly-elided result — names the retrieval id. */
+function elidedPlaceholder(id: string): string {
+  return `[tool result elided to save context — call ${RETRIEVE_TOOL} with id "${id}" to read the full result]`;
+}
+
+const RETRIEVE_SCHEMA = z.object({
+  id: z
+    .string()
+    .describe('The id shown in an elision placeholder, e.g. "toolu_01…".'),
+});
+
+const RETRIEVE_DESCRIPTION =
+  "Read back the full content of an earlier tool result that was elided to save context. Pass the id shown in the elision placeholder. Use it when you need details from a result that now reads as elided.";
+
+/**
+ * The auto-injected retrieval tool: looks an elided result up in the session's
+ * store by the id from its placeholder. Present only when `maxContextTokens` is
+ * set and reversible elision is on. Returns the original text the model saw, or
+ * a short miss message so the model can recover from a stale/wrong id.
+ */
+function makeRetrieveTool(store: Map<string, string>): AnyToolDef {
+  return {
+    description: RETRIEVE_DESCRIPTION,
+    input: RETRIEVE_SCHEMA,
+    run: ({ id }: { id: string }): string =>
+      store.get(id) ??
+      `No elided result found for id "${id}". It may not have been elided, or the id is wrong.`,
+  };
+}
+
 /**
  * Elide ephemeral tool results that the model has already seen — every message
  * but the last (the freshest results the next call still needs). Preserves the
@@ -931,12 +1022,18 @@ function elideEphemeral(
  * short placeholder, which keeps the tool_use/result pairing the API requires).
  * The last message is never touched, so the current turn's fresh results
  * survive. History is the cost that grows every turn; this bounds it.
+ *
+ * When a `store` is given, elision is *reversible*: each original is stashed
+ * under its tool_use id and the placeholder names that id, so the model can
+ * read it back via `toad_retrieve`. Without a store (or for the rare non-string
+ * result), elision is destructive — a fixed placeholder, original discarded.
  */
 function compactHistory(
   messages: LlmMessage[],
   systemText: string,
   tools: LlmTool[],
   maxContextTokens: number,
+  store: Map<string, string> | undefined,
 ): void {
   const fixed =
     estimateTokens(systemText) +
@@ -949,13 +1046,24 @@ function compactHistory(
     if (!Array.isArray(content)) continue;
     for (const block of content as Array<{
       type?: string;
+      tool_use_id?: string;
       content?: unknown;
     }>) {
       if (!over()) break;
+      if (block.type !== "tool_result") continue;
+      const id = block.tool_use_id;
+      const alreadyElided =
+        block.content === ELIDED_TOOL_RESULT ||
+        (typeof id === "string" && store?.has(id) === true);
+      if (alreadyElided) continue;
       if (
-        block.type === "tool_result" &&
-        block.content !== ELIDED_TOOL_RESULT
+        store !== undefined &&
+        typeof id === "string" &&
+        typeof block.content === "string"
       ) {
+        store.set(id, block.content);
+        block.content = elidedPlaceholder(id);
+      } else {
         block.content = ELIDED_TOOL_RESULT;
       }
     }

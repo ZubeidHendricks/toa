@@ -37,6 +37,8 @@ is a strict superset of [TOON](https://github.com/toon-format/toon).
 | `system` | no | `system: \|` + block | system prompt (defaults to the description) |
 | `uses` | no | `uses[N]: a,b` | sub-agents wired in as tools via `asTool()` |
 | `maxTurns` | no | number | max tool-use turns |
+| `maxContextTokens` | no | number | soft per-turn context budget; oldest tool results elided over it |
+| `retrieval` | no | boolean | reversible elision (default true): elided results stay readable via an injected `toad_retrieve` tool; `false` = destructive |
 | `retries` | no | number | model-call retries |
 | `temperature` | no | number 0–1 | sampling temperature (omit for the default) |
 
