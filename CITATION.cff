@@ -1,0 +1,10 @@
+cff-version: 1.2.0
+message: "If you use this software, please cite it using the metadata in this file."
+type: software
+title: "TOAD: Token-Oriented Agentic Development"
+authors:
+  - given-names: Zubeid
+    family-names: Hendricks
+version: 0.0.0
+license: MIT
+repository-code: "https://github.com/ZubeidHendricks/toad"
